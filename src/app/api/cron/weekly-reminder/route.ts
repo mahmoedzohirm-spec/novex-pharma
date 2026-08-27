@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { pharmacies, notifications } from "@/db/schema";
-import { gt, and } from "drizzle-orm";
+import { gt, and, isNotNull } from "drizzle-orm";
 
 export async function GET() {
   try {
-    // جلب الصيدليات التي لديها دين > 0
+    // جلب الصيدليات التي لديها دين > 0 واشتراك دفع مفعّل
     const pharmaciesWithDebt = await db
       .select()
       .from(pharmacies)
       .where(
         and(
-          gt(pharmacies.totalDebt, "0")
-          // isNotNull(pharmacies.pushSubscription)  // تم التعليق مؤقتاً لأن العمود غير موجود
+          gt(pharmacies.totalDebt, "0"),
+          isNotNull(pharmacies.pushSubscription)  
         )
       );
 
@@ -21,7 +21,7 @@ export async function GET() {
     for (const pharmacy of pharmaciesWithDebt) {
       const debt = parseFloat(String(pharmacy.totalDebt || "0"));
 
-      // إرسال تذكير
+      // إرسال تذكير (حفظ في قاعدة البيانات)
       await db.insert(notifications).values({
         pharmacyId: pharmacy.id,
         title: "تذكير أسبوعي بالدفع 📅",
