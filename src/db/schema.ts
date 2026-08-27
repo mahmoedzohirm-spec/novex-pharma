@@ -33,7 +33,7 @@ export const pharmacies = pgTable("pharmacies", {
     .default("5000"),
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes").default(""),
-   pushSubscription: text("push_subscription").default("")
+  pushSubscription: text("push_subscription").default(""),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
