@@ -6,15 +6,15 @@ import { gt, and, isNotNull } from "drizzle-orm";
 export async function GET() {
   try {
     // جلب الصيدليات التي لديها دين > 0
-    const pharmaciesWithDebt = await db
-      .select()
-      .from(pharmacies)
-      .where(
-        and(
-          gt(pharmacies.totalDebt, "0"),
-          isNotNull(pharmacies.pushSubscription)
-        )
-      );
+   const pharmaciesWithDebt = await db
+  .select()
+  .from(pharmacies)
+  .where(
+    and(
+      gt(pharmacies.totalDebt, "0")
+      // isNotNull(pharmacies.pushSubscription)  // تم التعليق مؤقتاً
+    )
+  );
 
     let sentCount = 0;
 
