@@ -13,7 +13,7 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-    "ignoreDeprecations": "6.0", // <-- أضف هذا
+    "ignoreDeprecations": "5.0", // <-- أضف هذا
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
