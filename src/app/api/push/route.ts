@@ -1,16 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/db";
+import { pharmacies } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { subscription, title, message, pharmacyId } = body;
 
+    // ✅ 1. حفظ الاشتراك في قاعدة البيانات (إذا أُرسل pharmacyId)
+    if (subscription && pharmacyId) {
+      await db
+        .update(pharmacies)
+        .set({
+          pushSubscription: JSON.stringify(subscription),
+          updatedAt: new Date(),
+        })
+        .where(eq(pharmacies.id, parseInt(pharmacyId)));
+    }
+
+    // ✅ 2. إرسال الإشعار الفعلي
     const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
     const VAPID_EMAIL = process.env.VAPID_EMAIL || "admin@novex.com";
 
     if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-      // VAPID keys not configured, return success silently
       return NextResponse.json({
         success: true,
         message: "VAPID keys not configured",
