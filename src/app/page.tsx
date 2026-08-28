@@ -59,15 +59,15 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      const isAuthPage = currentPage === "login" || currentPage === "register";
-      if (!isAuthPage && currentPage !== "catalog") {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setCurrentPage("catalog");
-      }
+  if (!isLoading && !user) {
+    const isAuthPage = currentPage === "login" || currentPage === "register";
+    const isMedicinePage = currentPage === "medicine" && selectedMedicineId !== null;
+    if (!isAuthPage && currentPage !== "catalog" && !isMedicinePage) {
+      setCurrentPage("catalog");
     }
-  }, [user, isLoading, currentPage]);
-
+  }
+}, [user, isLoading, currentPage, selectedMedicineId]);
+  
   useEffect(() => {
     if (!isLoading && user) {
       if (user.role === "admin" && currentPage !== "admin") {
