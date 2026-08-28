@@ -1,5 +1,5 @@
 // ============================================
-// ملف: src/components/PharmacyProfilePage.tsx (معدل - إزالة licenseNumber و address)
+// ملف: src/components/PharmacyProfilePage.tsx (معدل - إضافة الإشعارات التلقائية)
 // ============================================
 "use client";
 
@@ -17,11 +17,13 @@ import {
   Package,
   Clock,
   X,
+  Bell,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import { cn } from "@/lib/cn";
 import Image from "next/image";
+import { useServiceWorker } from "@/hooks/usePWA";
 
 interface Order {
   id: number;
@@ -48,6 +50,7 @@ interface PharmacyProfilePageProps {
 export default function PharmacyProfilePage({ initialTab = "profile" }: PharmacyProfilePageProps) {
   const { user, updateUser } = useAuth();
   const toast = useToast();
+  const { subscribeToPush } = useServiceWorker();
   const [orders, setOrders] = useState<Order[]>([]);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,11 +60,74 @@ export default function PharmacyProfilePage({ initialTab = "profile" }: Pharmacy
   const [receiptImage, setReceiptImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // ✅ استخدم initialTab مباشرة في useState (بدون useEffect)
+  const [notificationStatus, setNotificationStatus] = useState<"default" | "granted" | "denied">("default");
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
 
-  // ✅ حذف useEffect الذي يضبط activeTab (لم يعد مطلوباً)
+  // ✅ تفعيل الإشعارات تلقائياً عند تسجيل الدخول
+  useEffect(() => {
+    if (!user || user.role !== "pharmacy") return;
 
+    // تحديث حالة الإذن
+    if ("Notification" in window) {
+      setNotificationStatus(Notification.permission as "default" | "granted" | "denied");
+    }
+
+    // إذا كان الإذن غير محدد (default)، اطلب الإذن تلقائياً
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().then(async (permission) => {
+        setNotificationStatus(permission as "default" | "granted" | "denied");
+        if (permission === "granted") {
+          console.log("✅ تم منح إذن الإشعارات تلقائياً");
+          // بعد الموافقة، سجل الاشتراك
+          const subscription = await subscribeToPush();
+          if (subscription) {
+            try {
+              await fetch("/api/push", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  subscription,
+                  pharmacyId: user.id,
+                  title: "✅ تم تفعيل الإشعارات",
+                  message: "ستصلك الآن إشعارات التطبيق حتى عندما يكون مغلقاً",
+                }),
+              });
+              console.log("✅ تم حفظ الاشتراك في قاعدة البيانات");
+              toast.success("تم تفعيل الإشعارات", "ستصلك التنبيهات حتى خارج التطبيق");
+            } catch (error) {
+              console.error("❌ فشل حفظ الاشتراك:", error);
+            }
+          }
+        } else if (permission === "denied") {
+          toast.warning("الإشعارات معطلة", "يمكنك تفعيلها من إعدادات المتصفح");
+        }
+      });
+    }
+
+    // إذا كان الإذن ممنوحاً مسبقاً، سجل الاشتراك مباشرة (بدون طلب)
+    if ("Notification" in window && Notification.permission === "granted") {
+      subscribeToPush().then(async (subscription) => {
+        if (subscription) {
+          try {
+            // تحقق إذا كان الاشتراك موجوداً بالفعل في قاعدة البيانات
+            await fetch("/api/push", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                subscription,
+                pharmacyId: user.id,
+              }),
+            });
+            console.log("✅ تم تحديث الاشتراك للمستخدم");
+          } catch (error) {
+            console.error("❌ فشل تحديث الاشتراك:", error);
+          }
+        }
+      });
+    }
+  }, [user, subscribeToPush, toast]);
+
+  // جلب الطلبات والإيصالات
   useEffect(() => {
     if (!user) return;
     const fetchData = async () => {
@@ -81,7 +147,7 @@ export default function PharmacyProfilePage({ initialTab = "profile" }: Pharmacy
       }
     };
     fetchData();
-  }, []);
+  }, [user, toast]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -262,14 +328,23 @@ export default function PharmacyProfilePage({ initialTab = "profile" }: Pharmacy
 
       <div className="bg-linear-to-l from-blue-900 via-indigo-800 to-blue-800 pt-6 pb-4 px-4">
         <div className="max-w-4xl mx-auto">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-16 h-16 bg-linear-to-br from-cyan-400 to-blue-600 rounded-2xl flex items-center justify-center shadow-xl">
-              <User className="w-8 h-8 text-white" />
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-linear-to-br from-cyan-400 to-blue-600 rounded-2xl flex items-center justify-center shadow-xl">
+                <User className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-black text-white">{user.name}</h1>
+                <p className="text-blue-300">{user.ownerName}</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-black text-white">{user.name}</h1>
-              <p className="text-blue-300">{user.ownerName}</p>
-              {/* ✅ حذف licenseNumber لأنه غير موجود في AuthUser */}
+            {/* ✅ حالة الإشعارات */}
+            <div className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-1.5">
+              <Bell className="w-4 h-4 text-white" />
+              <span className="text-xs text-white">
+                {notificationStatus === "granted" ? "✅ مفعّل" : 
+                 notificationStatus === "denied" ? "❌ معطّل" : "⏳ في الانتظار"}
+              </span>
             </div>
           </div>
 
@@ -368,8 +443,6 @@ export default function PharmacyProfilePage({ initialTab = "profile" }: Pharmacy
                 {[
                   { icon: Phone, label: "الهاتف", value: user.phone },
                   { icon: Mail, label: "البريد", value: user.email },
-                  // ✅ حذف MapPin (address) لأنه غير موجود في AuthUser
-                  // ✅ حذف FileText (licenseNumber) لأنه غير موجود في AuthUser
                 ].map(({ icon: Icon, label, value }) => (
                   <div key={label} className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center shrink-0">
