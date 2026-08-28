@@ -1,6 +1,6 @@
 // ============================================
 // ملف: src/app/api/notifications/remind/route.ts
-// (إرسال تذكير فوري لصيدلية محددة)
+// (إرسال تذكير فوري لصيدلية محددة + Push)
 // ============================================
 
 import { NextRequest, NextResponse } from "next/server";
@@ -37,13 +37,48 @@ export async function POST(req: NextRequest) {
     const debt = parseFloat(String(pharmacy.totalDebt || "0"));
     const reminderMessage = message?.trim() || `لديك دين مستحق قدره ${debt.toFixed(2)} ₪، يرجى السداد.`;
 
-    // إنشاء إشعار للصيدلية
+    // 1️⃣ حفظ الإشعار في قاعدة البيانات (داخل التطبيق)
     await db.insert(notifications).values({
       pharmacyId: pharmacy.id,
       title: "تذكير بالدفع 📢",
       body: reminderMessage,
       type: "reminder",
     });
+
+    // 2️⃣ إرسال Push Notification (خارج التطبيق)
+    const pushSubscription = pharmacy.pushSubscription;
+    if (pushSubscription) {
+      try {
+        const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+        const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+        const VAPID_EMAIL = process.env.VAPID_EMAIL || "admin@novex.com";
+
+        if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+          const webpush = await import("web-push");
+          webpush.default.setVapidDetails(
+            `mailto:${VAPID_EMAIL}`,
+            VAPID_PUBLIC_KEY,
+            VAPID_PRIVATE_KEY
+          );
+
+          const payload = JSON.stringify({
+            title: "تذكير بالدفع 📢",
+            body: reminderMessage,
+            pharmacyId: pharmacy.id,
+          });
+
+          await webpush.default.sendNotification(
+            JSON.parse(pushSubscription),
+            payload
+          );
+          console.log(`✅ تم إرسال Push Notification للصيدلية #${pharmacyId}`);
+        }
+      } catch (pushError) {
+        console.error("❌ فشل إرسال Push Notification:", pushError);
+      }
+    } else {
+      console.log(`⚠️ لا يوجد اشتراك Push للصيدلية #${pharmacyId}`);
+    }
 
     return NextResponse.json({
       success: true,
