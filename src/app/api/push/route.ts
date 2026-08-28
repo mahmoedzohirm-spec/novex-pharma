@@ -8,7 +8,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { subscription, title, message, pharmacyId } = body;
 
-    // ✅ 1. حفظ الاشتراك في قاعدة البيانات (إذا أُرسل pharmacyId)
     if (subscription && pharmacyId) {
       await db
         .update(pharmacies)
@@ -19,7 +18,6 @@ export async function POST(req: NextRequest) {
         .where(eq(pharmacies.id, parseInt(pharmacyId)));
     }
 
-    // ✅ 2. إرسال الإشعار الفعلي
     const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
     const VAPID_EMAIL = process.env.VAPID_EMAIL || "admin@novex.com";
