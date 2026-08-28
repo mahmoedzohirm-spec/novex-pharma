@@ -120,10 +120,10 @@ function AppContent() {
   };
 
   const viewMedicineDetails = (id: number) => {
-    setSelectedMedicineId(id);
-    setCurrentPage("medicine");
-  };
-
+  console.log("🔄 فتح تفاصيل المنتج ID:", id);
+  setSelectedMedicineId(id);
+  setCurrentPage("medicine");
+};
   const handleBackToCatalog = () => {
     setCurrentPage("catalog");
   };
